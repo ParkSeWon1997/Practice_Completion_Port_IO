@@ -1,8 +1,12 @@
 ﻿
-
+#include"CCompletionPort.h"
 
 int main()
 {
-    std::cout << "Hello World!\n";
+    CCompletionPort IOServer;
+    IOServer.InitServer();
+    IOServer.Bind_Listen();
+
+    return 0;
 }
 

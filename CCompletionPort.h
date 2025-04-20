@@ -1,9 +1,7 @@
-#pragma once
-#pragma comment(lib,"ws2_32")
-#include<winsock2.h>
-#include<process.h>
-#include <iostream>
 
+
+#pragma once
+#include"define.h"
 
 struct tagClientInfo
 {
@@ -15,16 +13,21 @@ struct tagClientInfo
 class CCompletionPort
 {
 public:
-		CCompletionPort();
-		~CCompletionPort();
+	CCompletionPort() {};
+	~CCompletionPort() { WSACleanup(); };
 
 
 
 public:
 	bool InitServer();
+	bool Bind_Listen();
 
 
 
 
+
+private:
+	HANDLE	m_hCompletionPort = INVALID_HANDLE_VALUE;
+	SOCKET	m_ListenSocket = INVALID_SOCKET;
 };
 
