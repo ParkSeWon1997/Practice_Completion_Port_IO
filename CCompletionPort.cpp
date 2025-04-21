@@ -1,5 +1,9 @@
 #include "CCompletionPort.h"
 
+SYSTEM_INFO SystemInfo;
+
+
+
 bool CCompletionPort::InitServer()
 {
     WSADATA     wsaDATA;
@@ -22,8 +26,30 @@ bool CCompletionPort::InitServer()
         return false;
     }
 
-    
     cout << "[ Success ] Socket Initialize" << "\n";
+
+
+
+
+    /*
+    HANDLE WINAPI CreateIoCompletionPort(
+        _In_     HANDLE    FileHandle,
+        _In_opt_ HANDLE    ExistingCompletionPort,
+        _In_     ULONG_PTR CompletionKey,
+        _In_     DWORD     NumberOfConcurrentThreads        시스템에 있는 프로세서 수만큼
+        );
+        https://learn.microsoft.com/ko-kr/windows/win32/fileio/createiocompletionport
+    */
+    m_hCompletionPort = CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL,0 , 0);
+
+    if (NULL == m_hCompletionPort)
+    {
+        cout << "[ Fail ] CompletionPort Object No Create: " << GetLastError() << "\n";
+        return false;
+    }
+
+    GetSystemInfo(&SystemInfo);
+    cout << "[ Success ] CompletionPort Object Create" << "\n";
     return true;
 }
 
@@ -53,4 +79,56 @@ bool CCompletionPort::Bind_Listen()
 
     cout << "[ Success ] Server standby.." << "\n";
     return true;
+}
+
+bool CCompletionPort::startServer()
+{
+    CreateThread();
+
+    return false;
+}
+
+bool CCompletionPort::CreateThread()
+{
+    UINT    i = 0;
+    for (i; i < SystemInfo.dwNumberOfProcessors  ; i++)
+    {
+        m_IOWorkerThreads.emplace_back([this]() { WorkerThread(); });
+    }
+
+
+    cout << "[ Start Thread...] " << "\n";
+    return true;
+}
+
+void CCompletionPort::WorkerThread()
+{
+    tagClientInfo* pstClientSock = nullptr;
+    DWORD           dwByteIOSize = 0;
+    LPOVERLAPPED    lpOverlappedIOData = NULL;
+
+    BOOL        IsSuccess = TRUE;
+
+    while (m_IsWorkerRun)
+    {
+
+        IsSuccess = GetQueuedCompletionStatus(m_hCompletionPort, 
+                                                &dwByteIOSize, 
+                                                (PULONG_PTR)&pstClientSock, 
+                                                &lpOverlappedIOData, 
+                                                INFINITE);
+
+
+        if (TRUE == IsSuccess && 0 == dwByteIOSize && NULL == lpOverlappedIOData)
+        {
+            m_IsWorkerRun = false;
+            continue;
+        }
+        
+        if (NULL == lpOverlappedIOData)
+        {
+            continue;
+        }
+    }
+
 }
