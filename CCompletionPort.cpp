@@ -26,7 +26,7 @@ bool CCompletionPort::InitServer()
         return false;
     }
 
-    cout << "[ Success ] Socket Initialize" << "\n";
+    cout << "[ Success ] Socket Initialize\n";
 
 
 
@@ -47,9 +47,12 @@ bool CCompletionPort::InitServer()
         cout << "[ Fail ] CompletionPort Object No Create: " << GetLastError() << "\n";
         return false;
     }
+    cout << "[ Success ] CompletionPort Object Create\n";
 
     GetSystemInfo(&SystemInfo);
-    cout << "[ Success ] CompletionPort Object Create" << "\n";
+
+
+    CreateThread();
     return true;
 }
 
@@ -68,7 +71,7 @@ bool CCompletionPort::Bind_Listen()
         cout << "[ Fail ] bind() : " << WSAGetLastError() << "\n";
         return false;
     }
-    cout << "[ Success ] Socket Bind" << "\n";
+    cout << "[ Success ] Socket Bind \n";
 
     iResult = listen(m_ListenSocket, 5);
     if (0 != iResult)
@@ -77,15 +80,31 @@ bool CCompletionPort::Bind_Listen()
         return false;
     }
 
-    cout << "[ Success ] Server standby.." << "\n";
+    cout << "[ Success ] Server standby..\n";
     return true;
 }
 
 bool CCompletionPort::startServer()
 {
-    CreateThread();
+   
 
     return false;
+}
+
+void CCompletionPort::DestroyThread()
+{
+    m_IsWorkerRun = false;
+    CloseHandle(m_hCompletionPort);
+
+
+    for (auto& th : m_IOWorkerThreads)
+    {
+        if (th.joinable())
+        {
+            th.join();
+        }
+    }
+    closesocket(m_ListenSocket);
 }
 
 bool CCompletionPort::CreateThread()
@@ -95,15 +114,16 @@ bool CCompletionPort::CreateThread()
     {
         m_IOWorkerThreads.emplace_back([this]() { WorkerThread(); });
     }
+    cout << "[ Start Overlapped IO Thread ]\n";
 
-
-    cout << "[ Start Thread...] " << "\n";
+  
     return true;
 }
 
 void CCompletionPort::WorkerThread()
 {
-    tagClientInfo* pstClientSock = nullptr;
+  
+    tagClientInfo* pstClientSock = NULL;
     DWORD           dwByteIOSize = 0;
     LPOVERLAPPED    lpOverlappedIOData = NULL;
 
@@ -112,12 +132,15 @@ void CCompletionPort::WorkerThread()
     while (m_IsWorkerRun)
     {
 
+        
         IsSuccess = GetQueuedCompletionStatus(m_hCompletionPort, 
                                                 &dwByteIOSize, 
-                                                (PULONG_PTR)&pstClientSock, 
-                                                &lpOverlappedIOData, 
+                                                (PULONG_PTR)&pstClientSock, //입 출력을 완료한 소켓의 정보
+                                                &lpOverlappedIOData, //overlapped객체를 받기 위한 포인터
                                                 INFINITE);
 
+
+       
 
         if (TRUE == IsSuccess && 0 == dwByteIOSize && NULL == lpOverlappedIOData)
         {
@@ -129,6 +152,23 @@ void CCompletionPort::WorkerThread()
         {
             continue;
         }
+
+        tagOverlappedEx* pOverlappedEx = (tagOverlappedEx*)lpOverlappedIOData;
+
+        memcpy(pstClientSock->m_stSendOverlappedEx.buffer, pOverlappedEx->buffer, dwByteIOSize);
+        pstClientSock->m_stSendOverlappedEx.wsaBuf.len = dwByteIOSize;
+        pstClientSock->m_stSendOverlappedEx.wsaBuf.buf = pstClientSock->m_stSendOverlappedEx.buffer;
+
+        WSASend(pstClientSock->m_hClientSock,                                           //Overlapped 소켓 핸들                       //non-overlapped 소켓이 전달 되면 send 함수와 동일한 방식으로 데이터 전송
+            &(pstClientSock->m_stSendOverlappedEx.wsaBuf)                               //WSABUF 구조체 배열을 가리키는 포인터        //여기서는 전송할 데이터를 지니는 버퍼 정보
+            , 1                                                                         //lpBuffers가 가리키는 WSABUF 구조체 배열의 크기
+            , NULL                                                                      //실제로 전송된 바이트 수                    //비동기 전송이면 값을 무시해도 됨
+            , 0                                                                         //데이터 전송방식 옵션                       예)긴급 방식으로 데이터를 전송하는 경우
+            , (LPOVERLAPPED) &(pstClientSock->m_stSendOverlappedEx.overlapped)          //WSAOVERLAPPED구조체 변수 포인터           //중첩 출력이 아닌 경우 인자는 무시
+            , NULL);                                                                    //Completion Routine의 포인터               //중첩 출력이 아닌 경우 인자는 무시
+        
+
     }
 
 }
+

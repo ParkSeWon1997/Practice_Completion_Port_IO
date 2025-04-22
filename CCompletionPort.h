@@ -3,18 +3,6 @@
 #pragma once
 #include"define.h"
 
-struct tagClientInfo
-{
-	SOCKET	m_hClientSock;
-
-
-
-	tagClientInfo()
-	{
-		m_hClientSock = INVALID_SOCKET;
-	}
-	//SOCKET	
-};
 
 
 
@@ -30,13 +18,16 @@ public:
 	bool InitServer();
 	bool Bind_Listen();
 	bool startServer();
-	
+	void DestroyThread();
 
 
 private:
 	bool CreateThread();
 	void WorkerThread();
 	
+
+	void Sendmessage();
+
 
 
 private:
