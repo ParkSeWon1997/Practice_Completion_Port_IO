@@ -10,10 +10,10 @@ int main()
     IOServer.startServer();
 
 
-    while (1)
-    {
-        //Some Loop....
-    }
+    //while (1)
+    //{
+    //    //Some Loop....
+    //}
 
     IOServer.DestroyThread();
     return 0;

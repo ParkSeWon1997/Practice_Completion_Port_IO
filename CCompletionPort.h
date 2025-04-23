@@ -24,9 +24,9 @@ public:
 private:
 	bool CreateThread();
 	void WorkerThread();
-	
+	void AcceptClient();
 
-	void Sendmessage();
+	
 
 
 

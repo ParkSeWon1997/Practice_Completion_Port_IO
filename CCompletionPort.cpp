@@ -86,7 +86,9 @@ bool CCompletionPort::Bind_Listen()
 
 bool CCompletionPort::startServer()
 {
+    
    
+    AcceptClient();
 
     return false;
 }
@@ -123,6 +125,7 @@ bool CCompletionPort::CreateThread()
 void CCompletionPort::WorkerThread()
 {
   
+    
     tagClientInfo* pstClientSock = NULL;
     DWORD           dwByteIOSize = 0;
     LPOVERLAPPED    lpOverlappedIOData = NULL;
@@ -159,7 +162,8 @@ void CCompletionPort::WorkerThread()
         pstClientSock->m_stSendOverlappedEx.wsaBuf.len = dwByteIOSize;
         pstClientSock->m_stSendOverlappedEx.wsaBuf.buf = pstClientSock->m_stSendOverlappedEx.buffer;
 
-        WSASend(pstClientSock->m_hClientSock,                                           //Overlapped 소켓 핸들                       //non-overlapped 소켓이 전달 되면 send 함수와 동일한 방식으로 데이터 전송
+        int result = 0;
+        result = WSASend(pstClientSock->m_hClientSock,                                           //Overlapped 소켓 핸들                       //non-overlapped 소켓이 전달 되면 send 함수와 동일한 방식으로 데이터 전송
             &(pstClientSock->m_stSendOverlappedEx.wsaBuf)                               //WSABUF 구조체 배열을 가리키는 포인터        //여기서는 전송할 데이터를 지니는 버퍼 정보
             , 1                                                                         //lpBuffers가 가리키는 WSABUF 구조체 배열의 크기
             , NULL                                                                      //실제로 전송된 바이트 수                    //비동기 전송이면 값을 무시해도 됨
@@ -167,6 +171,69 @@ void CCompletionPort::WorkerThread()
             , (LPOVERLAPPED) &(pstClientSock->m_stSendOverlappedEx.overlapped)          //WSAOVERLAPPED구조체 변수 포인터           //중첩 출력이 아닌 경우 인자는 무시
             , NULL);                                                                    //Completion Routine의 포인터               //중첩 출력이 아닌 경우 인자는 무시
         
+        if (SOCKET_ERROR == result)
+        {
+            printf("[Error] Fail WSASend: %d\n", WSAGetLastError());
+        }
+
+
+        DWORD   flags = 0;
+
+
+        pstClientSock->m_stRecvOverlappedEx.wsaBuf.len = BUFFER_SIZE;
+        pstClientSock->m_stRecvOverlappedEx.wsaBuf.buf = pstClientSock->m_stRecvOverlappedEx.buffer;
+
+        WSARecv(pstClientSock->m_hClientSock,
+            &(pstClientSock->m_stRecvOverlappedEx.wsaBuf),
+            1,
+            NULL,
+            &flags,
+            (LPOVERLAPPED) & (pstClientSock->m_stRecvOverlappedEx.overlapped),
+            NULL);
+
+        if (SOCKET_ERROR == result)
+        {
+            printf("[Error] Fail WSARecv: %d\n", WSAGetLastError());
+        }
+
+    }
+
+}
+
+void CCompletionPort::AcceptClient()
+{
+    
+
+    while (true)
+    {
+        tagClientInfo* stClientSock = new tagClientInfo;
+        
+        SOCKADDR_IN		stClientAddr;
+        int nAddrLen = sizeof(SOCKADDR_IN);
+
+        stClientSock->m_hClientSock = accept(m_ListenSocket, (SOCKADDR*)&stClientAddr, &nAddrLen);
+        if (INVALID_SOCKET == stClientSock->m_hClientSock)
+        {
+            continue;
+        }
+
+        CreateIoCompletionPort((HANDLE)stClientSock->m_hClientSock, m_hCompletionPort, (ULONG_PTR)(stClientSock), 0);
+
+
+
+
+        DWORD   flags = 0;
+        stClientSock->m_stRecvOverlappedEx.wsaBuf.len = BUFFER_SIZE;
+        stClientSock->m_stRecvOverlappedEx.wsaBuf.buf = stClientSock->m_stRecvOverlappedEx.buffer;
+
+        WSARecv(stClientSock->m_hClientSock,
+            &(stClientSock->m_stRecvOverlappedEx.wsaBuf),
+            1,
+            NULL,
+            &flags,
+            (LPOVERLAPPED) & (stClientSock->m_stRecvOverlappedEx.overlapped),
+            NULL);
+
 
     }
 
